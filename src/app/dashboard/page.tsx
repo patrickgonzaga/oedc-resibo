@@ -21,8 +21,9 @@ export default function DashboardPage() {
 
   // Verification Modal State
   const [showVerifyModal, setShowVerifyModal] = useState(false);
-  const [scannedData, setScannedData] = useState<{ total: number, consumption: number, date: string } | null>(null);
+  const [scannedData, setScannedData] = useState<{ total: number, consumption: number, date: string, utilityType: 'electric' | 'water' } | null>(null);
   const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'electric' | 'water'>('electric');
 
   useEffect(() => setMounted(true), []);
 
@@ -52,7 +53,10 @@ export default function DashboardPage() {
         return;
       }
 
-      setScannedData(extracted);
+      setScannedData({
+        ...extracted,
+        utilityType: extracted.utilityType || 'electric'
+      });
       setShowVerifyModal(true);
 
     } catch (error) {
@@ -74,6 +78,7 @@ export default function DashboardPage() {
           total_amount: scannedData.total,
           consumption_kwh: scannedData.consumption,
           billing_date: scannedData.date,
+          utility_type: scannedData.utilityType,
         });
       } else {
         await addReceipt({
@@ -82,6 +87,7 @@ export default function DashboardPage() {
           total_amount: scannedData.total,
           consumption_kwh: scannedData.consumption,
           billing_date: scannedData.date,
+          utility_type: scannedData.utilityType,
         });
       }
       setShowVerifyModal(false);
@@ -96,11 +102,13 @@ export default function DashboardPage() {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
   }
 
-  const latestReceiptDate = receipts.length > 0
-    ? new Date(Math.max(...receipts.map(r => new Date(r.billing_date).getTime())))
+  const filteredReceipts = receipts.filter(r => r.utility_type === activeTab);
+
+  const latestReceiptDate = filteredReceipts.length > 0
+    ? new Date(Math.max(...filteredReceipts.map(r => new Date(r.billing_date).getTime())))
     : new Date();
 
-  const currentMonthReceipts = receipts.filter(r => isSameMonth(new Date(r.billing_date), latestReceiptDate));
+  const currentMonthReceipts = filteredReceipts.filter(r => isSameMonth(new Date(r.billing_date), latestReceiptDate));
 
   const totalBill = currentMonthReceipts.reduce((sum, r) => sum + r.total_amount, 0);
   const totalConsumption = currentMonthReceipts.reduce((sum, r) => sum + r.consumption_kwh, 0);
@@ -108,7 +116,7 @@ export default function DashboardPage() {
   // Chart data
   const chartData = Array.from({ length: 6 }).map((_, i) => {
     const d = subMonths(latestReceiptDate, 5 - i);
-    const monthReceipts = receipts.filter(r => isSameMonth(new Date(r.billing_date), d));
+    const monthReceipts = filteredReceipts.filter(r => isSameMonth(new Date(r.billing_date), d));
     return {
       name: format(d, 'MMM'),
       amount: monthReceipts.reduce((sum, r) => sum + r.total_amount, 0),
@@ -125,9 +133,26 @@ export default function DashboardPage() {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <Zap className="text-white w-5 h-5" />
             </div>
-            <span className="text-xl font-bold text-slate-900 dark:text-white">OEDC Resibo</span>
+            <span className="text-xl font-bold text-slate-900 dark:text-white">Resibo</span>
           </div>
           <div className="flex items-center space-x-4">
+            <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+              <button
+                onClick={() => setActiveTab('electric')}
+                className={`flex items-center px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === 'electric' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Electric
+              </button>
+              <button
+                onClick={() => setActiveTab('water')}
+                className={`flex items-center px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === 'water' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <Droplets className="w-4 h-4 mr-2" />
+                Water
+              </button>
+            </div>
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2" />
             {mounted && (
               <button
                 onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
@@ -192,11 +217,15 @@ export default function DashboardPage() {
           </div>
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center space-x-4 transition-colors">
             <div className="p-4 bg-teal-50 dark:bg-teal-900/30 rounded-xl">
-              <Zap className="w-8 h-8 text-teal-600 dark:text-teal-400" />
+              {activeTab === 'electric' ? (
+                <Zap className="w-8 h-8 text-teal-600 dark:text-teal-400" />
+              ) : (
+                <Droplets className="w-8 h-8 text-teal-600 dark:text-teal-400" />
+              )}
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Consumption</p>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white">{totalConsumption} <span className="text-xl font-medium text-slate-500 dark:text-slate-400">kWh</span></h2>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white">{totalConsumption} <span className="text-xl font-medium text-slate-500 dark:text-slate-400">{activeTab === 'electric' ? 'kWh' : 'm³'}</span></h2>
             </div>
           </div>
         </div>
@@ -219,12 +248,12 @@ export default function DashboardPage() {
                 </defs>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
                 <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(value) => `₱${value}`} />
-                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(value) => `${value}kWh`} />
+                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} tickFormatter={(value) => `${value}${activeTab === 'electric' ? 'kWh' : 'm³'}`} />
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.2} />
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#1E293B' : '#FFF', color: theme === 'dark' ? '#FFF' : '#000' }}
                   formatter={(value: any, name: any) => [
-                    name === 'amount' ? `₱${Number(value).toLocaleString()}` : `${value} kWh`,
+                    name === 'amount' ? `₱${Number(value).toLocaleString()}` : `${value} ${activeTab === 'electric' ? 'kWh' : 'm³'}`,
                     name === 'amount' ? 'Amount' : 'Consumption'
                   ]}
                 />
@@ -237,8 +266,8 @@ export default function DashboardPage() {
 
         {/* Recent History */}
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent Receipts</h3>
-          {receipts.length === 0 ? (
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent {activeTab === 'electric' ? 'Electric' : 'Water'} Receipts</h3>
+          {filteredReceipts.length === 0 ? (
             <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 border-dashed transition-colors">
               <FileText className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
               <p className="text-slate-500 dark:text-slate-400 font-medium">No receipts found</p>
@@ -266,7 +295,7 @@ export default function DashboardPage() {
                           ₱{receipt.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="py-4 px-6 text-sm text-slate-600 dark:text-slate-300">
-                          {receipt.consumption_kwh} kWh
+                          {receipt.consumption_kwh} {receipt.utility_type === 'electric' ? 'kWh' : 'm³'}
                         </td>
                         <td className="py-4 px-6 text-right">
                           <button
@@ -274,7 +303,8 @@ export default function DashboardPage() {
                               setScannedData({
                                 total: receipt.total_amount,
                                 consumption: receipt.consumption_kwh,
-                                date: receipt.billing_date
+                                date: receipt.billing_date,
+                                utilityType: receipt.utility_type
                               });
                               setEditingReceiptId(receipt.id);
                               setShowVerifyModal(true);
@@ -328,7 +358,19 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Total Consumption (kWh)</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Utility Type</label>
+                <select
+                  value={scannedData.utilityType}
+                  onChange={(e) => setScannedData({ ...scannedData, utilityType: e.target.value as 'electric' | 'water' })}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition"
+                >
+                  <option value="electric">Electric (OEDC)</option>
+                  <option value="water">Water (Subic Water)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Total Consumption ({scannedData.utilityType === 'electric' ? 'kWh' : 'm³'})</label>
                 <input
                   type="number"
                   value={scannedData.consumption}

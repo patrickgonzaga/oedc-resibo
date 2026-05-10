@@ -12,6 +12,7 @@ export interface Receipt {
   total_amount: number;
   consumption_kwh: number;
   billing_date: string;
+  utility_type: 'electric' | 'water';
   created_at: string;
 }
 
@@ -19,4 +20,5 @@ export interface ExtractedData {
   total: number;
   consumption: number;
   date: string;
+  utilityType?: 'electric' | 'water';
 }
