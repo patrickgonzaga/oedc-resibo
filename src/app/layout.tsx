@@ -7,7 +7,7 @@ import { ThemeProvider } from 'next-themes';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Kiloview Web',
+  title: 'Resibo',
   description: 'Understand your utility usage at a glance.',
 };
 

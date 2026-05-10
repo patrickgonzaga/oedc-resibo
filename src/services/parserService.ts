@@ -4,15 +4,22 @@ export const parseReceiptText = (text: string): ExtractedData => {
   // Normalize text to remove strange characters
   const cleanText = text.replace(/\|/g, '').trim();
 
-  // Target specific phrases as requested
+  // Target specific phrases
   const totalRegex = /total\s*amount\s*due[^\d]*([\d,]+\.\d{2})/i;
-  // Use [ \t:]* instead of [^\d]* so it doesn't jump to the next line and grab meter numbers like 39SE...
-  const consumptionRegex = /kwh\s*cons[ \t:=]*([\d,]+\.?\d*)/i;
+  
+  // Look for Consumption or kWh
+  const consumptionRegex = /(?:consumption|kwh\s*cons|usage)[ \t:=]*([\d,]+\.?\d*)/i;
   const billingMonthRegex = /billing\s*month[^\w]*(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/i;
 
   const totalMatch = cleanText.match(totalRegex);
   const consumptionMatch = cleanText.match(consumptionRegex);
   const billingMonthMatch = cleanText.match(billingMonthRegex);
+
+  // Detect Utility Type
+  let utilityType: 'electric' | 'water' = 'electric';
+  if (/water|subic\s*water|cubic\s*meter|m3/i.test(cleanText)) {
+    utilityType = 'water';
+  }
 
   // Helper to format Date without Timezone shifting to previous day
   const toLocalISOString = (d: Date) => {
@@ -33,15 +40,15 @@ export const parseReceiptText = (text: string): ExtractedData => {
   let consumption = consumptionMatch ? parseFloat(consumptionMatch[1].replace(/,/g, '')) : 0;
   if (consumption === 0) {
     // Fallback: look for typical Olongapo row format (e.g. 1.00 49,250.00 49,557.00 307.00)
-    // We make it more lenient by allowing any multiplier like 1.00, 1,00, 100 etc.
     const fOedc = cleanText.match(/(?:1[.,]00|100|1\.0)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})/i);
-    // More flexible kWh matcher
+    const fWater = cleanText.match(/(\d+\.?\d*)\s*(?:m3|cubic|cubic\s*meter)/i);
     const fMeralco = cleanText.match(/(\d+\.?\d*)\s*(?:kWh|kilowatt|kw|kh|kuh)/i);
-    // Also look for "CONS" or "USAGE" followed by a number
     const fUsage = cleanText.match(/(?:cons|usage|consumption)[^\d]*(\d+\.?\d*)/i);
     
     if (fOedc) {
       consumption = parseFloat(fOedc[1].replace(/,/g, ''));
+    } else if (fWater) {
+      consumption = parseFloat(fWater[1]);
     } else if (fMeralco) {
       consumption = parseFloat(fMeralco[1]);
     } else if (fUsage) {
@@ -66,5 +73,6 @@ export const parseReceiptText = (text: string): ExtractedData => {
     total,
     consumption,
     date,
+    utilityType
   };
 };
