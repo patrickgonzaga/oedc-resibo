@@ -1,78 +1,92 @@
-import { ExtractedData } from '../types';
+import { ExtractedData, UtilityType } from '../types';
 
 export const parseReceiptText = (text: string): ExtractedData => {
-  // Normalize text to remove strange characters
   const cleanText = text.replace(/\|/g, '').trim();
+  const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-  // Target specific phrases
-  const totalRegex = /total\s*amount\s*due[^\d]*([\d,]+\.\d{2})/i;
-  
-  // Look for Consumption or kWh
-  const consumptionRegex = /(?:consumption|kwh\s*cons|usage)[ \t:=]*([\d,]+\.?\d*)/i;
-  const billingMonthRegex = /billing\s*month[^\w]*(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/i;
+  let total = 0;
+  let consumption = 0;
+  let date = '';
+  let utilityType: UtilityType = UtilityType.ELECTRIC;
 
-  const totalMatch = cleanText.match(totalRegex);
-  const consumptionMatch = cleanText.match(consumptionRegex);
-  const billingMonthMatch = cleanText.match(billingMonthRegex);
-
-  // Detect Utility Type
-  let utilityType: 'electric' | 'water' = 'electric';
-  if (/water|subic\s*water|cubic\s*meter|m3/i.test(cleanText)) {
-    utilityType = 'water';
+  if (/water|subic/i.test(cleanText)) {
+    utilityType = UtilityType.WATER;
   }
 
-  // Helper to format Date without Timezone shifting to previous day
-  const toLocalISOString = (d: Date) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  // --- SIMPLEST PARSING LOGIC ---
 
-  // Parse Total
-  let total = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
-  if (total === 0) {
-    const fTotal = cleanText.match(/(?:total|amount|due)[\s:]*([\d,]+\.\d{2})/i);
-    if (fTotal) total = parseFloat(fTotal[1].replace(/,/g, ''));
-  }
+  // 1. Billing Month & Year
+  const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  // OCR sometimes reads Billing Month as "LLG Hou" or "Bill Hou"
+  const billingMonthLine = lines.find(l => 
+    (/hou|bill|period|month/i.test(l)) && 
+    months.some(m => new RegExp(m.substring(0, 3), 'i').test(l))
+  );
 
-  // Parse Consumption
-  let consumption = consumptionMatch ? parseFloat(consumptionMatch[1].replace(/,/g, '')) : 0;
-  if (consumption === 0) {
-    // Fallback: look for typical Olongapo row format (e.g. 1.00 49,250.00 49,557.00 307.00)
-    const fOedc = cleanText.match(/(?:1[.,]00|100|1\.0)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})/i);
-    const fWater = cleanText.match(/(\d+\.?\d*)\s*(?:m3|cubic|cubic\s*meter)/i);
-    const fMeralco = cleanText.match(/(\d+\.?\d*)\s*(?:kWh|kilowatt|kw|kh|kuh)/i);
-    const fUsage = cleanText.match(/(?:cons|usage|consumption)[^\d]*(\d+\.?\d*)/i);
-    
-    if (fOedc) {
-      consumption = parseFloat(fOedc[1].replace(/,/g, ''));
-    } else if (fWater) {
-      consumption = parseFloat(fWater[1]);
-    } else if (fMeralco) {
-      consumption = parseFloat(fMeralco[1]);
-    } else if (fUsage) {
-      consumption = parseFloat(fUsage[1]);
+  if (billingMonthLine) {
+    for (let i = 0; i < months.length; i++) {
+      const mMatch = new RegExp(months[i].substring(0, 3), 'i').test(billingMonthLine);
+      if (mMatch) {
+        const yearMatch = billingMonthLine.match(/202[0-9]/);
+        const year = yearMatch ? parseInt(yearMatch[0]) : new Date().getFullYear();
+        const month = String(i + 1).padStart(2, '0');
+        date = `${year}-${month}-01`;
+        break;
+      }
     }
   }
-  
-  // Parse Date
-  let date = toLocalISOString(new Date());
-  if (billingMonthMatch) {
-    const parsedDate = new Date(`${billingMonthMatch[1]} 1, ${billingMonthMatch[2]}`);
-    if (!isNaN(parsedDate.getTime())) date = toLocalISOString(parsedDate);
+
+  // 2. Consumption
+  if (utilityType === UtilityType.WATER) {
+    const waterConsMatch = cleanText.match(/(?:consumption|current\s*month)[^\d]*(\d+)/i);
+    if (waterConsMatch) consumption = parseInt(waterConsMatch[1]);
   } else {
-    const fMonth = cleanText.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/i);
-    if (fMonth) {
-      const parsedDate = new Date(`${fMonth[1]} 1, ${fMonth[2]}`);
-      if (!isNaN(parsedDate.getTime())) date = toLocalISOString(parsedDate);
+    // Electric: Use robust calculation logic (Present - Previous)
+    // Find a row with 1.00 followed by several numbers
+    const oedcRowMatch = cleanText.match(/(?:1[.,]00|100|1\.0)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)/);
+    if (oedcRowMatch) {
+      const val1 = parseFloat(oedcRowMatch[1].replace(/,/g, ''));
+      const val2 = parseFloat(oedcRowMatch[2].replace(/,/g, ''));
+      const val3 = parseFloat(oedcRowMatch[3].replace(/,/g, ''));
+      
+      // Calculate difference between reading columns
+      if (Math.abs(val2 - val1) > 0 && Math.abs(val2 - val1) < 2000) {
+        consumption = Math.abs(val2 - val1);
+      } else if (Math.abs(val3 - val2) > 0 && Math.abs(val3 - val2) < 2000) {
+        consumption = Math.abs(val3 - val2);
+      } else {
+        consumption = val3; // Last column fallback
+      }
+    }
+
+    // Fallback: Label-based if row match fails
+    if (consumption === 0) {
+      const consLabelIndex = lines.findIndex(l => /kwh|cons|usage/i.test(l));
+      if (consLabelIndex !== -1 && lines[consLabelIndex + 1]) {
+        const nextLine = lines[consLabelIndex + 1];
+        const allNums = nextLine.match(/[\d,]+\.\d{2}|[\d,]+\.\d{1}|\d{2,}/g);
+        if (allNums && allNums.length > 0) {
+          consumption = parseFloat(allNums[allNums.length - 1].replace(/,/g, ''));
+        }
+      }
     }
   }
 
-  return {
-    total,
-    consumption,
-    date,
-    utilityType
-  };
+  // 3. Total Amount Due
+  const totalMatch = cleanText.match(/(?:total\s*amount\s*due|amount\s*due|total\s*current\s*bill)[^\d]*([\d,]+\.\d{2})/i);
+  if (totalMatch) {
+    total = parseFloat(totalMatch[1].replace(/,/g, ''));
+  } else {
+    // Fallback for total: Last currency formatted number
+    const allAmounts = cleanText.match(/[\d,]+\.\d{2}/g);
+    if (allAmounts) total = parseFloat(allAmounts[allAmounts.length - 1].replace(/,/g, ''));
+  }
+
+  // Fallback for date if not found
+  if (!date) {
+    const d = new Date();
+    date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  }
+
+  return { total, consumption, date, utilityType };
 };

@@ -1,54 +1,24 @@
 const fs = require('fs');
 
-const text = fs.readFileSync('ocr_output.txt', 'utf8');
+const cleanText = fs.readFileSync('water_ocr_output.txt', 'utf8').replace(/\|/g, '').trim();
 
-const parseReceiptText = (text) => {
-  const totalRegex = /(?:total|amount|due|pay)[^\d]*([\d,]+\.?\d{0,2})/i;
-  // Look for sequence: MULTIPLIER (e.g. 1.00) PREV CURR CONS
-  const consumptionRegexRow = /(?:1\.00|MULTIPLIER)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)/;
-  const consumptionRegexFallback = /(?:consumption)[^\d]*(\d+\.?\d*)|(\d+\.?\d*)\s*(?:kWh|kilowatt)/i;
-  
-  const dateRegex = /(\d{4}-\d{2}-\d{2})|(\w{3,9}\s\d{1,2},?\s\d{4})|(\d{2}\/\d{2}\/\d{4})/;
+console.log('--- OCR SNIPPET ---');
+console.log(cleanText.substring(cleanText.indexOf('Consumption'), cleanText.indexOf('Amount') + 50));
 
-  const totalMatch = text.match(totalRegex);
-  
-  let consumption = 0;
-  const rowMatch = text.match(consumptionRegexRow);
-  if (rowMatch) {
-     const prev = parseFloat(rowMatch[1].replace(/,/g, ''));
-     const curr = parseFloat(rowMatch[2].replace(/,/g, ''));
-     const diff = parseFloat(rowMatch[3].replace(/,/g, ''));
-     if (Math.abs((curr - prev) - diff) < 1) {
-        consumption = diff;
-     } else {
-        consumption = diff; // likely it's the last number anyway
-     }
-  } else {
-     const fallbackMatch = text.match(consumptionRegexFallback);
-     if (fallbackMatch) {
-       consumption = parseFloat(fallbackMatch[1] || fallbackMatch[2]);
-     }
+const r1 = cleanText.match(/(?:current\s*month|month\s*\))[^\d]*(\d+)/i);
+console.log('R1 (Current Month):', r1 ? r1[1] : 'null');
+
+const r2 = cleanText.match(/(?:cons|usage|kwh).*?([\d,]+\.?\d*)/i);
+console.log('R2 (Cons/Usage):', r2 ? r2[1] : 'null');
+
+const r3 = cleanText.match(/(\d+)\s*(?:m3|cubic|meter)/i);
+console.log('R3 (m3):', r3 ? r3[1] : 'null');
+
+// Find all numbers on lines containing "Month"
+const lines = cleanText.split('\n');
+lines.forEach(line => {
+  if (line.toLowerCase().includes('month')) {
+    console.log('Line with Month:', line);
+    console.log('Numbers on this line:', line.match(/\d+/g));
   }
-  
-  const dateMatch = text.match(dateRegex);
-
-  const total = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
-  
-  let date = new Date().toISOString().split('T')[0];
-  if (dateMatch) {
-    try {
-      const parsedDate = new Date(dateMatch[0]);
-      if (!isNaN(parsedDate.getTime())) {
-        date = parsedDate.toISOString().split('T')[0];
-      }
-    } catch(e) {}
-  }
-
-  return {
-    total,
-    consumption,
-    date,
-  };
-};
-
-console.log(parseReceiptText(text));
+});

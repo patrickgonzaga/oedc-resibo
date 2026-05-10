@@ -5,6 +5,11 @@ export interface UserProfile {
   created_at: string;
 }
 
+export enum UtilityType {
+  ELECTRIC = 'electric',
+  WATER = 'water'
+}
+
 export interface Receipt {
   id: string;
   user_id: string;
@@ -12,7 +17,7 @@ export interface Receipt {
   total_amount: number;
   consumption_kwh: number;
   billing_date: string;
-  utility_type: 'electric' | 'water';
+  utility_type: UtilityType;
   created_at: string;
 }
 
@@ -20,5 +25,5 @@ export interface ExtractedData {
   total: number;
   consumption: number;
   date: string;
-  utilityType?: 'electric' | 'water';
+  utilityType?: UtilityType;
 }
