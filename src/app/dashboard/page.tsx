@@ -223,8 +223,8 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.2} />
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#1E293B' : '#FFF', color: theme === 'dark' ? '#FFF' : '#000' }}
-                  formatter={(value: number, name: string) => [
-                    name === 'amount' ? `₱${value.toLocaleString()}` : `${value} kWh`,
+                  formatter={(value: any, name: any) => [
+                    name === 'amount' ? `₱${Number(value).toLocaleString()}` : `${value} kWh`,
                     name === 'amount' ? 'Amount' : 'Consumption'
                   ]}
                 />

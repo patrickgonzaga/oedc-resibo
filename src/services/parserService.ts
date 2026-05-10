@@ -33,12 +33,19 @@ export const parseReceiptText = (text: string): ExtractedData => {
   let consumption = consumptionMatch ? parseFloat(consumptionMatch[1].replace(/,/g, '')) : 0;
   if (consumption === 0) {
     // Fallback: look for typical Olongapo row format (e.g. 1.00 49,250.00 49,557.00 307.00)
-    const fOedc = cleanText.match(/1\.00\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})/i);
-    const fMeralco = cleanText.match(/(\d+\.?\d*)\s*(?:kWh|kilowatt)/i);
+    // We make it more lenient by allowing any multiplier like 1.00, 1,00, 100 etc.
+    const fOedc = cleanText.match(/(?:1[.,]00|100|1\.0)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+([\d,]+\.\d{2})/i);
+    // More flexible kWh matcher
+    const fMeralco = cleanText.match(/(\d+\.?\d*)\s*(?:kWh|kilowatt|kw|kh|kuh)/i);
+    // Also look for "CONS" or "USAGE" followed by a number
+    const fUsage = cleanText.match(/(?:cons|usage|consumption)[^\d]*(\d+\.?\d*)/i);
+    
     if (fOedc) {
       consumption = parseFloat(fOedc[1].replace(/,/g, ''));
     } else if (fMeralco) {
       consumption = parseFloat(fMeralco[1]);
+    } else if (fUsage) {
+      consumption = parseFloat(fUsage[1]);
     }
   }
   
