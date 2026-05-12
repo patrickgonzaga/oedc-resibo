@@ -7,8 +7,11 @@ import { ThemeProvider } from 'next-themes';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Resibo',
-  description: 'Understand your utility usage at a glance.',
+  title: 'Resibo - Smart Utility Tracker',
+  description: 'Track your electric and water consumption with ease using smart OCR scanning.',
+  icons: {
+    icon: '/resibo-icon.png',
+  }
 };
 
 export default function RootLayout({
