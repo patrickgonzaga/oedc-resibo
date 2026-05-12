@@ -3,11 +3,11 @@ import { supabase } from '../lib/supabase';
 import { UserProfile, Receipt } from '../types';
 
 interface AppState {
-  user: UserProfile | null;
+  user: any | null;
   receipts: Receipt[];
   isLoading: boolean;
   
-  setUser: (user: UserProfile | null) => void;
+  setUser: (user: any | null) => void;
   fetchReceipts: () => Promise<void>;
   addReceipt: (receipt: Omit<Receipt, 'id' | 'created_at'>) => Promise<void>;
   deleteReceipt: (id: string) => Promise<void>;

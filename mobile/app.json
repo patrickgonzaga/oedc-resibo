@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Resibo",
+    "slug": "resibo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/resibo-icon.png",
+    "splash": {
+      "image": "./assets/resibo-mascot.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1E293B"
+    },
+    "updates": { "fallbackToCacheTimeout": 0 },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true },
+    "android": { "adaptiveIcon": { "foregroundImage": "./assets/resibo-icon.png", "backgroundColor": "#1E293B" } },
+    "web": { "favicon": "./assets/resibo-icon.png" }
+  }
+}
