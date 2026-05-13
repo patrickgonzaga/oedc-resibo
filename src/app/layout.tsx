@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import AuthProvider from '@/components/AuthProvider';
@@ -6,12 +6,20 @@ import { ThemeProvider } from 'next-themes';
 
 const inter = Inter({ subsets: ['latin'] });
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+};
+
 export const metadata: Metadata = {
   title: 'Resibo - Smart Utility Tracker',
   description: 'Track your electric and water consumption with ease using smart OCR scanning.',
   icons: {
     icon: '/resibo-icon.png',
-  }
+  },
 };
 
 export default function RootLayout({
